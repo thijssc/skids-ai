@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`h-full ${jakarta.variable}`}>
-      <body className="min-h-screen">{children}</body>
+      <body style={{ margin: 0, height: '100vh', overflow: 'hidden' }}>{children}</body>
     </html>
   )
 }

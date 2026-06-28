@@ -18,26 +18,34 @@ export default async function Home() {
   const yards = [...new Set(allSkids.map(s => s.yard).filter(Boolean))]
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
+    <div style={{ display: 'flex', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
       <Sidebar />
 
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Page header */}
-        <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', margin: 0 }}>Skid Database</h1>
-            <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '2px 0 0' }}>Historical filtration skid designs</p>
-          </div>
-          <div style={{ display: 'flex', gap: 20, fontSize: 12, fontFamily: 'monospace' }}>
-            <Stat value={allSkids.length} label="total" color="var(--text-dim)" />
-            <Stat value={standardCount} label="standard" color="#10b981" />
-            <Stat value={allSkids.length - standardCount} label="custom" color="var(--amber)" />
-            <Stat value={yards.length} label="yards" color="var(--text-dim)" />
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: '0 0 4px' }}>
+                Skid Database
+                <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 400, color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '1px 8px', borderRadius: 4 }}>
+                  {allSkids.length}
+                </span>
+              </h1>
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: 0 }}>
+                Historical filtration skid designs — Seable&amp;Co.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 20, fontSize: 12 }}>
+              <Stat value={standardCount} label="Standard" color="var(--green)" />
+              <Stat value={allSkids.length - standardCount} label="Custom" color="var(--amber)" />
+              <Stat value={yards.length} label="Yards" color="var(--text-dim)" />
+            </div>
           </div>
         </div>
 
-        {/* Table */}
-        <div style={{ flex: 1, overflow: 'auto' }}>
+        {/* Table — fills remaining height */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <SkidTable skids={allSkids} />
         </div>
       </main>
@@ -48,8 +56,8 @@ export default async function Home() {
 function Stat({ value, label, color }: { value: number; label: string; color: string }) {
   return (
     <div style={{ textAlign: 'right' }}>
-      <span style={{ fontWeight: 600, color }}>{value}</span>
-      <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{label}</span>
+      <span style={{ fontWeight: 600, color, fontFamily: 'monospace' }}>{value}</span>
+      <span style={{ color: 'var(--text-muted)', marginLeft: 5, fontSize: 11 }}>{label}</span>
     </div>
   )
 }

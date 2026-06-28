@@ -1,26 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #080c14;
+  --bg-card: #0d1421;
+  --bg-hover: #111927;
+  --border: #1e2d45;
+  --blue: #3b82f6;
+  --cyan: #06b6d4;
+  --amber: #f59e0b;
+  --green: #10b981;
+  --text: #e2e8f0;
+  --text-dim: #64748b;
+  --text-muted: #334155;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+* { box-sizing: border-box; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, sans-serif;
+  margin: 0;
 }
+
+.mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.skid-row {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+.skid-row:hover { background: var(--bg-hover); cursor: pointer; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }

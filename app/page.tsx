@@ -1,65 +1,78 @@
-import Image from "next/image";
+import { supabase } from '@/lib/supabase'
+import { Skid } from '@/lib/types'
+import SkidTable from '@/components/SkidTable'
+import Link from 'next/link'
 
-export default function Home() {
+export const revalidate = 60
+
+export default async function Home() {
+  const { data: skids, error } = await supabase
+    .from('skids')
+    .select('*')
+    .order('date', { ascending: false })
+
+  if (error) console.error(error)
+
+  const allSkids: Skid[] = skids || []
+  const standardCount = allSkids.filter(s => s.is_standard).length
+  const yards = [...new Set(allSkids.map(s => s.yard).filter(Boolean))]
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+
+      {/* Header */}
+      <header style={{ borderBottom: '1px solid var(--border)', background: 'rgba(8,12,20,0.95)' }}
+        className="sticky top-0 z-50 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #3b82f6, #06b6d4)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <rect x="2" y="7" width="20" height="14" rx="1" />
+                <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+              </svg>
+            </div>
+            <span className="text-lg font-bold tracking-tight text-white" style={{ fontFamily: 'monospace' }}>SKIDS.AI</span>
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#1e2d45', color: '#64748b', fontFamily: 'monospace' }}>BETA</span>
+          </div>
+          <nav className="flex items-center gap-6">
+            <span className="text-sm font-medium" style={{ color: 'var(--blue)' }}>Database</span>
+            <Link href="/match" className="text-sm" style={{ color: 'var(--text-dim)' }}>
+              RFQ Matcher
+            </Link>
+          </nav>
+        </div>
+      </header>
+
+      {/* Hero stats bar */}
+      <div style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <h1 className="text-2xl font-bold text-white mb-1">Filtration Skid Database</h1>
+          <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
+            AI-powered matching of historical skid designs — Seable&amp;Co.
           </p>
+          <div className="flex items-center gap-10">
+            <Stat value={allSkids.length} label="Skids indexed" color="var(--blue)" />
+            <Stat value={standardCount} label="Standard designs" color="#10b981" />
+            <Stat value={allSkids.length - standardCount} label="Custom builds" color="var(--amber)" />
+            <Stat value={yards.length} label="Yards" color="var(--cyan)" />
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
+
+      {/* Table */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <SkidTable skids={allSkids} />
+      </div>
     </div>
-  );
+  )
+}
+
+function Stat({ value, label, color }: { value: number; label: string; color: string }) {
+  return (
+    <div>
+      <div className="text-3xl font-bold" style={{ color, fontFamily: 'monospace' }}>{value}</div>
+      <div className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>{label}</div>
+    </div>
+  )
 }

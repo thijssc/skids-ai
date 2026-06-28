@@ -41,24 +41,19 @@ export default function Sidebar() {
       flexShrink: 0,
     }}>
       {/* Logo banner */}
-      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--border)' }}>
-        <div className="flex items-center gap-2.5">
-          <div style={{
-            width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-            background: 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2">
-              <rect x="2" y="7" width="20" height="14" rx="1.5" />
-              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-            </svg>
+      <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* S&Co. monogram */}
+          <div style={{ width: 36, height: 36, borderRadius: 7, background: '#fff', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/sco-monogram.png" alt="S&Co." style={{ width: 28, height: 28, objectFit: 'contain' }} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', letterSpacing: '0.04em' }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', letterSpacing: '0.06em' }}>
               SKIDS.AI
             </div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>
-              Seable&amp;Co. · Internal
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
+              Seable&amp;Co.
             </div>
           </div>
         </div>

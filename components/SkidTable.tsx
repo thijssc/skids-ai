@@ -101,7 +101,7 @@ function SkidPhysicalTable({ skids, onRow }: { skids: Skid[]; onRow: (id: number
         {skids.map((s, i) => (
           <tr key={s.id} className="skid-row" style={{ background: i % 2 === 0 ? 'var(--bg-card)' : 'var(--bg)' }} onClick={() => onRow(s.id)}>
             <td style={{ padding: '6px 8px', width: 52 }}>
-              <SkidIconWrapper length={s.length_mm} width={s.width_mm} height={s.height_mm} isStandard={s.is_standard} thumbnailUrl={s.thumbnail_url} size={30} />
+              <SkidIconWrapper length={s.length_mm} width={s.width_mm} height={s.height_mm} isStandard={s.is_standard} thumbnailUrl={s.thumbnail_url} size={52} />
             </td>
             <TD mono bold>{s.project_number}</TD>
             <TD dim>{s.vessel_name}</TD>
@@ -160,7 +160,7 @@ function PoolSpecTable({ skids, onRow }: { skids: Skid[]; onRow: (id: number) =>
         {skids.map((s, i) => (
           <tr key={s.id} className="skid-row" style={{ background: i % 2 === 0 ? 'var(--bg-card)' : 'var(--bg)' }} onClick={() => onRow(s.id)}>
             <td style={{ padding: '6px 8px', width: 52 }}>
-              <SkidIconWrapper length={s.length_mm} width={s.width_mm} height={s.height_mm} isStandard={s.is_standard} thumbnailUrl={s.thumbnail_url} size={30} />
+              <SkidIconWrapper length={s.length_mm} width={s.width_mm} height={s.height_mm} isStandard={s.is_standard} thumbnailUrl={s.thumbnail_url} size={52} />
             </td>
             <TD mono bold>{s.project_number}</TD>
             <TD dim>{s.vessel_name}</TD>

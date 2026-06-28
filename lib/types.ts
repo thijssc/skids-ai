@@ -34,6 +34,7 @@ export interface Skid {
   notes: string | null
   source_skid_url: string | null
   source_pid_url: string | null
+  thumbnail_url: string | null
   created_at: string
   similarity?: number
 }

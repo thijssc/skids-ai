@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { Skid } from '@/lib/types'
 import SkidTable from '@/components/SkidTable'
-import Link from 'next/link'
+import Sidebar from '@/components/Sidebar'
 
 export const revalidate = 60
 
@@ -18,55 +18,38 @@ export default async function Home() {
   const yards = [...new Set(allSkids.map(s => s.yard).filter(Boolean))]
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
+      <Sidebar />
 
-      {/* Header */}
-      <header style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}
-        className="sticky top-0 z-50">
-        <div className="px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #3b82f6, #06b6d4)' }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-                <rect x="2" y="7" width="20" height="14" rx="1" />
-                <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-              </svg>
-            </div>
-            <span className="text-sm font-bold tracking-widest" style={{ fontFamily: 'monospace', color: 'var(--text)', letterSpacing: '0.15em' }}>SKIDS.AI</span>
-            <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 10 }}>BETA</span>
-
-            <div className="ml-4 flex items-center gap-1" style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16 }}>
-              <NavItem active>Database</NavItem>
-              <Link href="/match"><NavItem>RFQ Matcher</NavItem></Link>
-            </div>
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Page header */}
+        <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h1 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', margin: 0 }}>Skid Database</h1>
+            <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '2px 0 0' }}>Historical filtration skid designs</p>
           </div>
-
-          <div className="flex items-center gap-6 text-xs" style={{ color: 'var(--text-dim)', fontFamily: 'monospace' }}>
-            <span>{allSkids.length} skids</span>
-            <span style={{ color: 'var(--text-muted)' }}>·</span>
-            <span style={{ color: '#10b981' }}>{standardCount} standard</span>
-            <span style={{ color: 'var(--text-muted)' }}>·</span>
-            <span style={{ color: 'var(--amber)' }}>{allSkids.length - standardCount} custom</span>
-            <span style={{ color: 'var(--text-muted)' }}>·</span>
-            <span>{yards.length} yards</span>
+          <div style={{ display: 'flex', gap: 20, fontSize: 12, fontFamily: 'monospace' }}>
+            <Stat value={allSkids.length} label="total" color="var(--text-dim)" />
+            <Stat value={standardCount} label="standard" color="#10b981" />
+            <Stat value={allSkids.length - standardCount} label="custom" color="var(--amber)" />
+            <Stat value={yards.length} label="yards" color="var(--text-dim)" />
           </div>
         </div>
-      </header>
 
-      {/* Table — full width, no container padding */}
-      <SkidTable skids={allSkids} />
+        {/* Table */}
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <SkidTable skids={allSkids} />
+        </div>
+      </main>
     </div>
   )
 }
 
-function NavItem({ children, active }: { children: React.ReactNode; active?: boolean }) {
+function Stat({ value, label, color }: { value: number; label: string; color: string }) {
   return (
-    <span className="px-3 py-1.5 rounded text-xs cursor-pointer" style={{
-      color: active ? 'var(--text)' : 'var(--text-dim)',
-      background: active ? 'var(--bg-hover)' : 'transparent',
-      fontFamily: 'monospace',
-    }}>
-      {children}
-    </span>
+    <div style={{ textAlign: 'right' }}>
+      <span style={{ fontWeight: 600, color }}>{value}</span>
+      <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{label}</span>
+    </div>
   )
 }

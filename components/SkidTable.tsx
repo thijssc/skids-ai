@@ -124,7 +124,7 @@ function SkidPhysicalTable({ skids, onRow }: { skids: Skid[]; onRow: (id: number
             </td>
             <TD mono dim>{s.date ? new Date(s.date).getFullYear() : null}</TD>
             <td style={{ padding: '6px 12px', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
-              <FileLinks skidUrl={s.source_skid_url} pidUrl={s.source_pid_url} />
+              <FileLinks skidUrl={s.source_skid_url} pidUrl={s.source_pid_url} stepUrl={s.source_step_url} />
             </td>
           </tr>
         ))}
@@ -278,8 +278,8 @@ function TableIcon() {
   )
 }
 
-function FileLinks({ skidUrl, pidUrl }: { skidUrl?: string | null; pidUrl?: string | null }) {
-  if (!skidUrl && !pidUrl) return <span style={{ color: 'var(--text-muted)' }}>—</span>
+function FileLinks({ skidUrl, pidUrl, stepUrl }: { skidUrl?: string | null; pidUrl?: string | null; stepUrl?: string | null }) {
+  if (!skidUrl && !pidUrl && !stepUrl) return <span style={{ color: 'var(--text-muted)' }}>—</span>
   return (
     <div style={{ display: 'flex', gap: 6 }}>
       {skidUrl && (
@@ -300,6 +300,15 @@ function FileLinks({ skidUrl, pidUrl }: { skidUrl?: string | null; pidUrl?: stri
             <polyline points="14 2 14 8 20 8" />
           </svg>
           P&amp;ID
+        </a>
+      )}
+      {stepUrl && (
+        <a href={stepUrl} target="_blank" rel="noopener noreferrer" title="STEP file (3D)"
+          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500, textDecoration: 'none', background: 'rgba(245,158,11,0.1)', color: 'var(--amber)' }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          </svg>
+          STEP
         </a>
       )}
     </div>

@@ -3,10 +3,20 @@
 import { useState, useRef, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 
+interface SkidResult {
+  project_number: string
+  vessel_name?: string
+  yard?: string
+  pool_volume_m3?: number
+  heater_total_kw?: number
+  match_score?: number
+  is_standard?: boolean
+}
+
 interface Message {
   role: 'user' | 'assistant'
   content: string
-  tool_result?: unknown
+  tool_result?: SkidResult[]
 }
 
 const SUGGESTIONS = [

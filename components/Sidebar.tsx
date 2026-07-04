@@ -25,6 +25,17 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    label: 'Skid Agent',
+    href: '/agent',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M12 2a4 4 0 0 1 4 4v1h1a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v1a4 4 0 0 1-8 0v-1H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1V6a4 4 0 0 1 4-4z" />
+        <path d="M9 14h.01M15 14h.01" />
+      </svg>
+    ),
+    badge: 'AI',
+  },
 ]
 
 export default function Sidebar() {
@@ -80,7 +91,12 @@ export default function Sidebar() {
                 onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-dim)' } }}
               >
                 <span style={{ opacity: active ? 1 : 0.6 }}>{item.icon}</span>
-                {item.label}
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {'badge' in item && item.badge && (
+                  <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: 'rgba(79,142,247,0.15)', color: 'var(--blue)', letterSpacing: '0.05em' }}>
+                    {item.badge}
+                  </span>
+                )}
               </div>
             </Link>
           )

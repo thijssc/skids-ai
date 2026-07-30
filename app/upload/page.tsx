@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import Sidebar from '@/components/Sidebar'
-import StepUploader from '@/components/StepUploader'
+
+const StepUploader = dynamic(() => import('@/components/StepUploader'), { ssr: false })
 
 export default function UploadPage() {
   return (

@@ -14,11 +14,16 @@ type Status = 'idle' | 'extracting' | 'parsing' | 'rendering' | 'done' | 'error'
 interface SkidOption { id: number; project_number: string; vessel_name: string | null }
 
 export default function StepUploader() {
+  // Single stable canvas ref — never conditionally rendered so renderer stays bound
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
+  const sceneRef = useRef<THREE.Scene | null>(null)
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
+  const frameRef = useRef<number>(0)
+
   const [status, setStatus] = useState<Status>('idle')
   const [statusMsg, setStatusMsg] = useState('')
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
+  const [meshCount, setMeshCount] = useState(0)
   const [skids, setSkids] = useState<SkidOption[]>([])
   const [selectedSkidId, setSelectedSkidId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
@@ -30,12 +35,23 @@ export default function StepUploader() {
       .then(({ data }) => setSkids(data || []))
   }, [])
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(frameRef.current)
+      rendererRef.current?.dispose()
+    }
+  }, [])
+
   const processStepBuffer = useCallback(async (buffer: ArrayBuffer, filename: string) => {
+    cancelAnimationFrame(frameRef.current)
+    rendererRef.current?.dispose()
+    rendererRef.current = null
+
     setStatus('parsing')
     setStatusMsg(`Parsing STEP: ${filename}…`)
 
     try {
-      // Run OCCT in a Web Worker to avoid blocking the main thread
       const result = await new Promise<any>((resolve, reject) => {
         const worker = new Worker('/occt-import-js-worker.js')
         worker.onmessage = (e) => { resolve(e.data); worker.terminate() }
@@ -43,7 +59,7 @@ export default function StepUploader() {
         worker.postMessage({ format: 'step', buffer: new Uint8Array(buffer), params: null })
       })
 
-      if (!result.success) {
+      if (!result.success || !result.meshes?.length) {
         setStatus('error')
         setStatusMsg('OCCT kon het STEP bestand niet lezen')
         return
@@ -52,15 +68,13 @@ export default function StepUploader() {
       setStatus('rendering')
       setStatusMsg('Rendering 3D model…')
 
-      // Build Three.js scene from OCCT mesh data
       const scene = new THREE.Scene()
       scene.background = new THREE.Color(0x1a2332)
-
       const group = new THREE.Group()
       scene.add(group)
 
-      let minY = Infinity, maxY = -Infinity
       let minX = Infinity, maxX = -Infinity
+      let minY = Infinity, maxY = -Infinity
       let minZ = Infinity, maxZ = -Infinity
 
       const meshColors = [
@@ -77,46 +91,31 @@ export default function StepUploader() {
         if (mesh.index) {
           geo.setIndex(new THREE.BufferAttribute(new Uint32Array(mesh.index.array), 1))
         }
-        geo.computeBoundingBox()
         geo.computeVertexNormals()
 
-        // Track bounds
         const pos = mesh.attributes.position.array
         for (let j = 0; j < pos.length; j += 3) {
-          if (pos[j]   < minX) minX = pos[j]
-          if (pos[j]   > maxX) maxX = pos[j]
-          if (pos[j+1] < minY) minY = pos[j+1]
-          if (pos[j+1] > maxY) maxY = pos[j+1]
-          if (pos[j+2] < minZ) minZ = pos[j+2]
-          if (pos[j+2] > maxZ) maxZ = pos[j+2]
+          if (pos[j]   < minX) minX = pos[j];   if (pos[j]   > maxX) maxX = pos[j]
+          if (pos[j+1] < minY) minY = pos[j+1]; if (pos[j+1] > maxY) maxY = pos[j+1]
+          if (pos[j+2] < minZ) minZ = pos[j+2]; if (pos[j+2] > maxZ) maxZ = pos[j+2]
         }
 
         const color = mesh.color
           ? new THREE.Color(mesh.color[0], mesh.color[1], mesh.color[2])
           : new THREE.Color(meshColors[i % meshColors.length])
 
-        const mat = new THREE.MeshPhongMaterial({
-          color,
-          shininess: 60,
-          specular: new THREE.Color(0x334455),
-          side: THREE.DoubleSide,
-        })
-        group.add(new THREE.Mesh(geo, mat))
+        group.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+          color, shininess: 60, specular: new THREE.Color(0x334455), side: THREE.DoubleSide,
+        })))
       })
 
-      // Center model
-      const cx = (minX + maxX) / 2
-      const cy = (minY + maxY) / 2
-      const cz = (minZ + maxZ) / 2
-      group.position.set(-cx, -cy, -cz)
+      group.position.set(-(minX + maxX) / 2, -(minY + maxY) / 2, -(minZ + maxZ) / 2)
 
-      // Camera
       const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ)
       const camera = new THREE.PerspectiveCamera(40, 1, span * 0.001, span * 100)
       camera.position.set(span * 0.8, span * 0.6, span * 0.9)
       camera.lookAt(0, 0, 0)
 
-      // Lighting
       scene.add(new THREE.AmbientLight(0xffffff, 0.5))
       const sun = new THREE.DirectionalLight(0xffffff, 1.2)
       sun.position.set(span, span * 1.5, span)
@@ -124,46 +123,35 @@ export default function StepUploader() {
       const fill = new THREE.DirectionalLight(0x88aacc, 0.4)
       fill.position.set(-span, span * 0.5, -span)
       scene.add(fill)
-      const rim = new THREE.DirectionalLight(0xffffff, 0.3)
-      rim.position.set(0, -span, 0)
-      scene.add(rim)
 
-      // Render to canvas
-      const SIZE = 400
+      // Use the single always-mounted canvas
       const canvas = canvasRef.current!
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true })
-      renderer.setSize(SIZE, SIZE)
-      renderer.setPixelRatio(2)
-      renderer.shadowMap.enabled = true
-      rendererRef.current = renderer
+      renderer.setSize(400, 400)
+      renderer.setPixelRatio(window.devicePixelRatio)
 
-      // Render a nice angle (isometric-ish)
       group.rotation.x = -0.35
       group.rotation.y = 0.65
       renderer.render(scene, camera)
 
-      // Capture PNG
-      const png = canvas.toDataURL('image/png')
-      setThumbnailUrl(png)
+      rendererRef.current = renderer
+      sceneRef.current = scene
+      cameraRef.current = camera
+
+      setMeshCount(result.meshes.length)
       setStatus('done')
       setStatusMsg(`${result.meshes.length} meshes geladen`)
 
-      // Start slow spin for preview
+      // Spin animation
       let angle = group.rotation.y
-      let frame: number
       const spin = () => {
-        frame = requestAnimationFrame(spin)
+        frameRef.current = requestAnimationFrame(spin)
         angle += 0.008
         group.rotation.y = angle
         renderer.render(scene, camera)
-        // Update PNG periodically for the "best angle" save
-        if (Math.abs((angle % (Math.PI * 2)) - 0.65) < 0.01) {
-          setThumbnailUrl(canvas.toDataURL('image/png'))
-        }
       }
       spin()
 
-      return () => cancelAnimationFrame(frame)
     } catch (e: any) {
       setStatus('error')
       setStatusMsg('Fout: ' + e.message)
@@ -172,8 +160,7 @@ export default function StepUploader() {
 
   const handleFile = useCallback(async (file: File) => {
     setSaved(false)
-    setThumbnailUrl(null)
-    rendererRef.current?.dispose()
+    setSelectedSkidId(null)
 
     if (file.name.toLowerCase().endsWith('.zip')) {
       setStatus('extracting')
@@ -200,35 +187,39 @@ export default function StepUploader() {
   }, [processStepBuffer])
 
   const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setDragOver(false)
+    e.preventDefault(); setDragOver(false)
     const file = e.dataTransfer.files[0]
     if (file) handleFile(file)
   }, [handleFile])
 
-  const onFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) handleFile(file)
-  }
-
   const saveThumbnail = async () => {
-    if (!selectedSkidId || !canvasRef.current) return
+    if (!selectedSkidId) return
     setSaving(true)
 
-    // Capture directly from canvas (avoids black-image issue with data URLs)
-    const blob = await new Promise<Blob | null>(resolve => canvasRef.current!.toBlob(resolve, 'image/png'))
-    if (!blob) { setStatusMsg('Canvas capture mislukt'); setSaving(false); return }
-    const filename = `skid_${selectedSkidId}_${Date.now()}.png`
+    // Re-render at best angle, then capture from renderer.domElement
+    // (renderer.domElement is always the correct canvas, regardless of React ref state)
+    const renderer = rendererRef.current
+    const scene = sceneRef.current
+    const camera = cameraRef.current
+    if (!renderer || !scene || !camera) {
+      setStatusMsg('Renderer niet beschikbaar')
+      setSaving(false)
+      return
+    }
 
+    renderer.render(scene, camera)
+
+    const blob = await new Promise<Blob | null>(resolve =>
+      renderer.domElement.toBlob(resolve, 'image/png')
+    )
+    if (!blob) { setStatusMsg('Canvas capture mislukt'); setSaving(false); return }
+
+    const filename = `skid_${selectedSkidId}_${Date.now()}.png`
     const { error: upErr } = await supabase.storage
       .from('thumbnails')
       .upload(filename, blob, { contentType: 'image/png', upsert: true })
 
-    if (upErr) {
-      setStatusMsg('Storage fout: ' + upErr.message)
-      setSaving(false)
-      return
-    }
+    if (upErr) { setStatusMsg('Storage fout: ' + upErr.message); setSaving(false); return }
 
     const { data: { publicUrl } } = supabase.storage.from('thumbnails').getPublicUrl(filename)
 
@@ -268,7 +259,7 @@ export default function StepUploader() {
         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
           .zip (production package) · .stp · .step
         </div>
-        <input id="step-input" type="file" accept=".zip,.stp,.step" onChange={onFileInput} style={{ display: 'none' }} />
+        <input id="step-input" type="file" accept=".zip,.stp,.step" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} style={{ display: 'none' }} />
       </div>
 
       {/* Status */}
@@ -287,67 +278,59 @@ export default function StepUploader() {
         </div>
       )}
 
-      {/* Preview + save */}
-      {status === 'done' && (
-        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-          {/* Canvas preview */}
-          <div style={{ flexShrink: 0, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
-            <canvas ref={canvasRef} style={{ display: 'block', width: 280, height: 280 }} />
-          </div>
+      {/* Single canvas — always in DOM so renderer stays bound, visibility via CSS only */}
+      <div style={{
+        display: status === 'done' ? 'flex' : 'none',
+        gap: 20, alignItems: 'flex-start',
+      }}>
+        <div style={{ flexShrink: 0, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
+          <canvas ref={canvasRef} width={400} height={400} style={{ display: 'block', width: 280, height: 280 }} />
+        </div>
 
-          {/* Save controls */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
-                KOPPEL AAN PROJECT
-              </label>
-              <select
-                value={selectedSkidId ?? ''}
-                onChange={e => setSelectedSkidId(Number(e.target.value))}
-                style={{
-                  width: '100%', padding: '8px 10px', borderRadius: 7, fontSize: 13,
-                  background: 'var(--bg-hover)', border: '1px solid var(--border)',
-                  color: 'var(--text)', outline: 'none',
-                }}
-              >
-                <option value="">— selecteer project —</option>
-                {skids.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.project_number}{s.vessel_name ? ` — ${s.vessel_name}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              onClick={saveThumbnail}
-              disabled={!selectedSkidId || saving || saved}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              KOPPEL AAN PROJECT
+            </label>
+            <select
+              value={selectedSkidId ?? ''}
+              onChange={e => setSelectedSkidId(Number(e.target.value))}
               style={{
-                padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                border: 'none', cursor: selectedSkidId && !saving && !saved ? 'pointer' : 'default',
-                background: saved ? 'var(--green)' : 'var(--blue)',
-                color: 'white', opacity: (!selectedSkidId || saving) ? 0.5 : 1,
-                transition: 'all 0.15s',
+                width: '100%', padding: '8px 10px', borderRadius: 7, fontSize: 13,
+                background: 'var(--bg-hover)', border: '1px solid var(--border)',
+                color: 'var(--text)', outline: 'none',
               }}
             >
-              {saved ? '✓ Opgeslagen' : saving ? 'Uploaden…' : 'Opslaan als thumbnail'}
-            </button>
-
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
-              De thumbnail wordt opgeslagen in Supabase Storage en verschijnt direct als preview-icon in de database tabel.
-            </p>
+              <option value="">— selecteer project —</option>
+              {skids.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.project_number}{s.vessel_name ? ` — ${s.vessel_name}` : ''}
+                </option>
+              ))}
+            </select>
           </div>
+
+          <button
+            onClick={saveThumbnail}
+            disabled={!selectedSkidId || saving || saved}
+            style={{
+              padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              border: 'none', cursor: selectedSkidId && !saving && !saved ? 'pointer' : 'default',
+              background: saved ? 'var(--green)' : 'var(--blue)',
+              color: 'white', opacity: (!selectedSkidId || saving) ? 0.5 : 1,
+              transition: 'all 0.15s',
+            }}
+          >
+            {saved ? '✓ Opgeslagen' : saving ? 'Uploaden…' : 'Opslaan als thumbnail'}
+          </button>
+
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+            De thumbnail wordt opgeslagen in Supabase Storage en verschijnt als preview-icon in de database tabel.
+          </p>
         </div>
-      )}
+      </div>
 
-      {/* Canvas hidden until file loaded */}
-      {status !== 'done' && (
-        <canvas ref={canvasRef} style={{ display: 'none' }} />
-      )}
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

@@ -27,6 +27,7 @@ export default function StepUploader() {
   const [saving, setSaving]       = useState(false)
   const [saved, setSaved]         = useState(false)
   const [dragOver, setDragOver]   = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.from('skids').select('id, project_number, vessel_name').order('project_number')
@@ -60,13 +61,18 @@ export default function StepUploader() {
         return
       }
 
-      // Debug: log first mesh structure to console
+      // Debug: show mesh structure on page
       const m0 = result.meshes[0]
-      console.log('[OCCT] mesh[0] keys:', Object.keys(m0))
-      console.log('[OCCT] mesh[0].attributes keys:', m0.attributes ? Object.keys(m0.attributes) : 'no attributes')
-      console.log('[OCCT] mesh[0].attributes.position:', m0.attributes?.position)
-      console.log('[OCCT] mesh[0].index:', m0.index)
-      console.log('[OCCT] full mesh[0]:', JSON.stringify(m0).slice(0, 500))
+      const debugStr = JSON.stringify({
+        keys: Object.keys(m0),
+        attrKeys: m0.attributes ? Object.keys(m0.attributes) : null,
+        posType: m0.attributes?.position ? typeof m0.attributes.position : null,
+        posIsArray: Array.isArray(m0.attributes?.position),
+        posLen: m0.attributes?.position?.length ?? m0.attributes?.position?.array?.length ?? null,
+        indexLen: m0.index?.length ?? m0.index?.array?.length ?? null,
+        sample: JSON.stringify(m0).slice(0, 300),
+      }, null, 2)
+      setDebugInfo(debugStr)
 
       setStatus('rendering')
       setStatusMsg(`Rendering ${result.meshes.length} meshes…`)
@@ -290,6 +296,12 @@ export default function StepUploader() {
             </p>
           </div>
         </div>
+      )}
+
+      {debugInfo && (
+        <pre style={{ fontSize: 10, background: '#111', color: '#0f0', padding: 12, borderRadius: 8, overflow: 'auto', maxHeight: 300, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          {debugInfo}
+        </pre>
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

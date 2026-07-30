@@ -131,7 +131,7 @@ export default function StepUploader() {
       // Render to canvas
       const SIZE = 400
       const canvas = canvasRef.current!
-      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true })
       renderer.setSize(SIZE, SIZE)
       renderer.setPixelRatio(2)
       renderer.shadowMap.enabled = true

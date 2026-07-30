@@ -60,6 +60,14 @@ export default function StepUploader() {
         return
       }
 
+      // Debug: log first mesh structure to console
+      const m0 = result.meshes[0]
+      console.log('[OCCT] mesh[0] keys:', Object.keys(m0))
+      console.log('[OCCT] mesh[0].attributes keys:', m0.attributes ? Object.keys(m0.attributes) : 'no attributes')
+      console.log('[OCCT] mesh[0].attributes.position:', m0.attributes?.position)
+      console.log('[OCCT] mesh[0].index:', m0.index)
+      console.log('[OCCT] full mesh[0]:', JSON.stringify(m0).slice(0, 500))
+
       setStatus('rendering')
       setStatusMsg(`Rendering ${result.meshes.length} meshes…`)
 

@@ -212,12 +212,12 @@ export default function StepUploader() {
   }
 
   const saveThumbnail = async () => {
-    if (!thumbnailUrl || !selectedSkidId) return
+    if (!selectedSkidId || !canvasRef.current) return
     setSaving(true)
 
-    // Convert dataURL to blob
-    const res = await fetch(thumbnailUrl)
-    const blob = await res.blob()
+    // Capture directly from canvas (avoids black-image issue with data URLs)
+    const blob = await new Promise<Blob | null>(resolve => canvasRef.current!.toBlob(resolve, 'image/png'))
+    if (!blob) { setStatusMsg('Canvas capture mislukt'); setSaving(false); return }
     const filename = `skid_${selectedSkidId}_${Date.now()}.png`
 
     const { error: upErr } = await supabase.storage

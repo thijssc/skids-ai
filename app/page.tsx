@@ -9,7 +9,7 @@ export default async function Home() {
   const { data: skids, error } = await supabase
     .from('skids')
     .select('*')
-    .order('date', { ascending: false })
+    .order('project_number', { ascending: true })
 
   if (error) console.error(error)
 

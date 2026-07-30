@@ -31,21 +31,5 @@ export default function SkidIconWrapper({ length, width, height, isStandard, thu
     )
   }
 
-  // Fall back to 3D box from dimensions
-  if (!length || !width || !height) {
-    return (
-      <div style={{
-        width: size, height: size, borderRadius: 5, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg-hover)', border: '1px solid var(--border)',
-      }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5">
-          <rect x="2" y="7" width="20" height="14" rx="1" />
-          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-        </svg>
-      </div>
-    )
-  }
-
-  return <SkidIcon3D length={length} width={width} height={height} isStandard={!!isStandard} size={size} />
+  return <SkidIcon3D length={length} width={width} height={height} isStandard={isStandard} size={size} />
 }

@@ -35,14 +35,13 @@ export default function StepUploader() {
     setStatusMsg(`Parsing STEP: ${filename}…`)
 
     try {
-      // Dynamic import to avoid SSR issues
-      const initOcct = (await import('occt-import-js')).default
-      const occt = await initOcct({
-        locateFile: (f: string) => '/' + f,
+      // Run OCCT in a Web Worker to avoid blocking the main thread
+      const result = await new Promise<any>((resolve, reject) => {
+        const worker = new Worker('/occt-import-js-worker.js')
+        worker.onmessage = (e) => { resolve(e.data); worker.terminate() }
+        worker.onerror = (e) => { reject(new Error(e.message)); worker.terminate() }
+        worker.postMessage({ format: 'step', buffer: new Uint8Array(buffer), params: null })
       })
-
-      const fileBuffer = new Uint8Array(buffer)
-      const result = occt.ReadStepFile(fileBuffer, null)
 
       if (!result.success) {
         setStatus('error')

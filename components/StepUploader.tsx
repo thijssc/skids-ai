@@ -13,29 +13,24 @@ type Status = 'idle' | 'extracting' | 'parsing' | 'rendering' | 'done' | 'error'
 interface SkidOption { id: number; project_number: string; vessel_name: string | null }
 
 export default function StepUploader() {
-  // Renderer owns its own canvas — never attached to React DOM tree
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const sceneRef    = useRef<THREE.Scene | null>(null)
   const cameraRef   = useRef<THREE.PerspectiveCamera | null>(null)
   const frameRef    = useRef<number>(0)
 
-  const [status, setStatus]       = useState<Status>('idle')
-  const [statusMsg, setStatusMsg] = useState('')
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)  // data URL for <img> preview
-  const [skids, setSkids]         = useState<SkidOption[]>([])
+  const [status, setStatus]         = useState<Status>('idle')
+  const [statusMsg, setStatusMsg]   = useState('')
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [skids, setSkids]           = useState<SkidOption[]>([])
   const [selectedSkidId, setSelectedSkidId] = useState<number | null>(null)
-  const [saving, setSaving]       = useState(false)
-  const [saved, setSaved]         = useState(false)
-  const [dragOver, setDragOver]   = useState(false)
-  const [debugInfo, setDebugInfo] = useState<string | null>(null)
+  const [saving, setSaving]         = useState(false)
+  const [saved, setSaved]           = useState(false)
+  const [dragOver, setDragOver]     = useState(false)
 
   useEffect(() => {
     supabase.from('skids').select('id, project_number, vessel_name').order('project_number')
       .then(({ data }) => setSkids(data || []))
-    return () => {
-      cancelAnimationFrame(frameRef.current)
-      rendererRef.current?.dispose()
-    }
+    return () => { cancelAnimationFrame(frameRef.current); rendererRef.current?.dispose() }
   }, [])
 
   const processStepBuffer = useCallback(async (buffer: ArrayBuffer, filename: string) => {
@@ -43,41 +38,28 @@ export default function StepUploader() {
     rendererRef.current?.dispose()
     rendererRef.current = null
     setPreviewUrl(null)
-
     setStatus('parsing')
     setStatusMsg(`Parsing STEP: ${filename}…`)
 
     try {
       const result = await new Promise<any>((resolve, reject) => {
-        const worker = new Worker('/occt-import-js-worker.js')
+        const worker = new Worker('/skid-step-worker.js')
         worker.onmessage = (e) => { resolve(e.data); worker.terminate() }
         worker.onerror   = (e) => { reject(new Error(e.message)); worker.terminate() }
-        worker.postMessage({ format: 'step', buffer: new Uint8Array(buffer), params: null })
+        // Send as transferable for performance
+        const copy = buffer.slice(0)
+        worker.postMessage({ buffer: new Uint8Array(copy) }, [copy])
       })
 
       if (!result.success || !result.meshes?.length) {
         setStatus('error')
-        setStatusMsg('OCCT kon het STEP bestand niet lezen')
+        setStatusMsg(result.error ?? 'OCCT kon het STEP bestand niet lezen')
         return
       }
-
-      // Debug: show mesh structure on page
-      const m0 = result.meshes[0]
-      const debugStr = JSON.stringify({
-        keys: Object.keys(m0),
-        attrKeys: m0.attributes ? Object.keys(m0.attributes) : null,
-        posType: m0.attributes?.position ? typeof m0.attributes.position : null,
-        posIsArray: Array.isArray(m0.attributes?.position),
-        posLen: m0.attributes?.position?.length ?? m0.attributes?.position?.array?.length ?? null,
-        indexLen: m0.index?.length ?? m0.index?.array?.length ?? null,
-        sample: JSON.stringify(m0).slice(0, 300),
-      }, null, 2)
-      setDebugInfo(debugStr)
 
       setStatus('rendering')
       setStatusMsg(`Rendering ${result.meshes.length} meshes…`)
 
-      // Build scene
       const scene = new THREE.Scene()
       scene.background = new THREE.Color(0x1a2332)
       const group = new THREE.Group()
@@ -93,27 +75,17 @@ export default function StepUploader() {
       ]
 
       result.meshes.forEach((mesh: any, i: number) => {
-        if (!mesh.attributes?.position?.array?.length) return
+        const positions: Float32Array = mesh.positions
+        if (!positions?.length) return
+
         const geo = new THREE.BufferGeometry()
-        const positions = Array.isArray(mesh.attributes.position.array)
-          ? new Float32Array(mesh.attributes.position.array)
-          : mesh.attributes.position.array
         geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-
-        if (mesh.attributes.normal?.array?.length) {
-          const normals = Array.isArray(mesh.attributes.normal.array)
-            ? new Float32Array(mesh.attributes.normal.array)
-            : mesh.attributes.normal.array
-          geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+        if (mesh.normals?.length) {
+          geo.setAttribute('normal', new THREE.BufferAttribute(mesh.normals as Float32Array, 3))
         }
-
-        if (mesh.index?.array?.length) {
-          const indices = Array.isArray(mesh.index.array)
-            ? new Uint32Array(mesh.index.array)
-            : mesh.index.array
-          geo.setIndex(new THREE.BufferAttribute(indices, 1))
+        if (mesh.indices?.length) {
+          geo.setIndex(new THREE.BufferAttribute(mesh.indices as Uint32Array, 1))
         }
-
         geo.computeVertexNormals()
 
         for (let j = 0; j < positions.length; j += 3) {
@@ -148,11 +120,9 @@ export default function StepUploader() {
       const fill = new THREE.DirectionalLight(0x88aacc, 0.4)
       fill.position.set(-span, span * 0.5, -span); scene.add(fill)
 
-      // Renderer owns its own canvas — fully offscreen, never in React DOM
       const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
       renderer.setSize(600, 600)
       renderer.setPixelRatio(1)
-      renderer.shadowMap.enabled = false
 
       group.rotation.x = -0.35
       group.rotation.y = 0.65
@@ -162,29 +132,24 @@ export default function StepUploader() {
       sceneRef.current    = scene
       cameraRef.current   = camera
 
-      // Capture initial preview image
-      const dataUrl = renderer.domElement.toDataURL('image/png')
-      setPreviewUrl(dataUrl)
+      setPreviewUrl(renderer.domElement.toDataURL('image/png'))
       setStatus('done')
       setStatusMsg(`${result.meshes.length} meshes geladen`)
 
-      // Spin preview: re-render + update img src
       let angle = group.rotation.y
       const spin = () => {
         frameRef.current = requestAnimationFrame(spin)
         angle += 0.008
         group.rotation.y = angle
         renderer.render(scene, camera)
-        // Update preview image every ~15 frames
-        if (Math.round(angle * 20) % 15 === 0) {
+        if (Math.round(angle * 20) % 20 === 0) {
           setPreviewUrl(renderer.domElement.toDataURL('image/png'))
         }
       }
       spin()
 
     } catch (e: any) {
-      setStatus('error')
-      setStatusMsg('Fout: ' + e.message)
+      setStatus('error'); setStatusMsg('Fout: ' + e.message)
     }
   }, [])
 
@@ -209,12 +174,9 @@ export default function StepUploader() {
   const saveThumbnail = async () => {
     if (!selectedSkidId || !rendererRef.current || !sceneRef.current || !cameraRef.current) return
     setSaving(true)
-
-    // Render a clean frame and capture
     rendererRef.current.render(sceneRef.current, cameraRef.current)
     const blob = await new Promise<Blob | null>(resolve =>
       rendererRef.current!.domElement.toBlob(resolve, 'image/png'))
-
     if (!blob) { setStatusMsg('Canvas capture mislukt'); setSaving(false); return }
 
     const filename = `skid_${selectedSkidId}_${Date.now()}.png`
@@ -226,28 +188,22 @@ export default function StepUploader() {
     const { error: dbErr } = await supabase.from('skids')
       .update({ thumbnail_url: publicUrl }).eq('id', selectedSkidId)
 
-    if (dbErr) { setStatusMsg('DB fout: ' + dbErr.message) }
+    if (dbErr) setStatusMsg('DB fout: ' + dbErr.message)
     else { setSaved(true); setStatusMsg('Thumbnail opgeslagen!') }
     setSaving(false)
   }
 
-  const statusColor = status === 'error' ? 'var(--red)' : status === 'done' ? 'var(--green)' : 'var(--blue)'
-  const statusBg    = status === 'error' ? 'rgba(239,68,68,0.1)' : status === 'done' ? 'rgba(34,197,94,0.1)' : 'rgba(79,142,247,0.08)'
+  const sc = status === 'error' ? 'var(--red)' : status === 'done' ? 'var(--green)' : 'var(--blue)'
+  const sb = status === 'error' ? 'rgba(239,68,68,0.1)' : status === 'done' ? 'rgba(34,197,94,0.1)' : 'rgba(79,142,247,0.08)'
 
   return (
     <div style={{ maxWidth: 700, display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-      {/* Drop zone */}
       <div
         onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onClick={() => document.getElementById('step-input')?.click()}
-        style={{
-          border: `2px dashed ${dragOver ? 'var(--blue)' : 'var(--border)'}`,
-          borderRadius: 12, padding: '40px 24px', textAlign: 'center', cursor: 'pointer',
-          background: dragOver ? 'rgba(79,142,247,0.05)' : 'var(--bg-card)', transition: 'all 0.15s',
-        }}
+        style={{ border: `2px dashed ${dragOver ? 'var(--blue)' : 'var(--border)'}`, borderRadius: 12, padding: '40px 24px', textAlign: 'center', cursor: 'pointer', background: dragOver ? 'rgba(79,142,247,0.05)' : 'var(--bg-card)', transition: 'all 0.15s' }}
       >
         <div style={{ fontSize: 32, marginBottom: 10 }}>📦</div>
         <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500, marginBottom: 4 }}>Sleep ZIP of STEP bestand hier</div>
@@ -255,24 +211,18 @@ export default function StepUploader() {
         <input id="step-input" type="file" accept=".zip,.stp,.step" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} style={{ display: 'none' }} />
       </div>
 
-      {/* Status */}
       {status !== 'idle' && (
-        <div style={{ padding: '10px 14px', borderRadius: 8, fontSize: 12, background: statusBg, color: statusColor, border: `1px solid ${statusColor}33`, display: 'flex', alignItems: 'center', gap: 8 }}>
-          {status !== 'done' && status !== 'error' && (
-            <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid currentColor', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-          )}
+        <div style={{ padding: '10px 14px', borderRadius: 8, fontSize: 12, background: sb, color: sc, border: `1px solid ${sc}33`, display: 'flex', alignItems: 'center', gap: 8 }}>
+          {status !== 'done' && status !== 'error' && <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid currentColor', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
           {statusMsg}
         </div>
       )}
 
-      {/* Preview */}
       {status === 'done' && previewUrl && (
         <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-          {/* img tag — shows offscreen canvas output */}
           <div style={{ flexShrink: 0, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
             <img src={previewUrl} alt="STEP preview" style={{ display: 'block', width: 280, height: 280, objectFit: 'contain' }} />
           </div>
-
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>KOPPEL AAN PROJECT</label>
@@ -282,26 +232,15 @@ export default function StepUploader() {
                 {skids.map(s => <option key={s.id} value={s.id}>{s.project_number}{s.vessel_name ? ` — ${s.vessel_name}` : ''}</option>)}
               </select>
             </div>
-
             <button onClick={saveThumbnail} disabled={!selectedSkidId || saving || saved}
-              style={{ padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none',
-                cursor: selectedSkidId && !saving && !saved ? 'pointer' : 'default',
-                background: saved ? 'var(--green)' : 'var(--blue)', color: 'white',
-                opacity: (!selectedSkidId || saving) ? 0.5 : 1, transition: 'all 0.15s' }}>
+              style={{ padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', cursor: selectedSkidId && !saving && !saved ? 'pointer' : 'default', background: saved ? 'var(--green)' : 'var(--blue)', color: 'white', opacity: (!selectedSkidId || saving) ? 0.5 : 1, transition: 'all 0.15s' }}>
               {saved ? '✓ Opgeslagen' : saving ? 'Uploaden…' : 'Opslaan als thumbnail'}
             </button>
-
             <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
-              De thumbnail wordt opgeslagen in Supabase Storage en verschijnt als preview-icon in de database tabel.
+              Thumbnail wordt opgeslagen in Supabase Storage en verschijnt als preview-icon in de database tabel.
             </p>
           </div>
         </div>
-      )}
-
-      {debugInfo && (
-        <pre style={{ fontSize: 10, background: '#111', color: '#0f0', padding: 12, borderRadius: 8, overflow: 'auto', maxHeight: 300, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-          {debugInfo}
-        </pre>
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
